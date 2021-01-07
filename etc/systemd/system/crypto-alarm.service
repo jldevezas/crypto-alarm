@@ -1,0 +1,18 @@
+[Unit]
+Description=crypto-alarm alarm for crypto changes
+DefaultDependencies=no
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nobody
+ExecStart=/opt/crypto-alarm/crypto-alarm.py -c bitcoin,ethereum -s 1000,100
+TimeoutStartSec=0
+RemainAfterExit=yes
+WorkingDirectory=/opt/crypto-alarm
+Restart=always
+RestartSec=30s
+
+[Install]
+WantedBy=default.target

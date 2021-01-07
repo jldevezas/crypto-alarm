@@ -5,6 +5,7 @@
 # 2021-01-07
 
 import argparse
+import math
 import os
 import signal
 import sys
@@ -32,11 +33,11 @@ def build_track_coin(args):
     def track_coin():
         price = cg.get_price(ids=args.coins, vs_currencies='usd')
         for coin, step in zip(args.coins.split(','), map(int, args.steps.split(','))):
-            if price[coin]['usd'] > last_price[coin] + step:
+            if price[coin]['usd'] >= math.ceil(last_price[coin] / step) * step:
                 clog(f"{coin} price target increased to {price[coin]['usd']} USD", color='green')
                 playsound(args.up_alert)
 
-            elif price[coin]['usd'] < last_price[coin] - step:
+            elif price[coin]['usd'] <= math.floor(last_price[coin] / step) * step:
                 clog(f"{coin} price target decreased to {price[coin]['usd']} USD", color='red')
                 playsound(args.down_alert)
 
@@ -84,8 +85,8 @@ if __name__ == '__main__':
         '-i', '--interval',
         type=int,
         required=False,
-        default=30,
-        help="price check interval in seconds")
+        default=300,
+        help="price check interval in seconds (default: 5 min, according to CoinGecko API updates)")
 
     parser.add_argument(
         '-k', '--kill',
