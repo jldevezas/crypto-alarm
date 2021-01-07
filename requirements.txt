@@ -1,0 +1,6 @@
+pygobject
+playsound
+pycoingecko
+apscheduler
+termcolor
+daemonize
