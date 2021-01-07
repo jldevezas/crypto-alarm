@@ -8,10 +8,22 @@ A cross-platform python daemon to configure crypto sound alarms.
 
 ## Installation
 
-Requires python 3.x and pip.
+Basic requirements are python 3.x and pip.
 
 ```shell
 pip install -r requirements.txt
+```
+
+## systemd (optional)
+
+Ensure the python binary in `crypto-alarm/etc/systemd/system/crypto-alarm.service` is correct, and then:
+
+```shell
+cd crypto-alarm/
+sudo cp -i etc/systemd/system/crypto-alarm.service /etc/systemd/system
+sudo systemctl daemon-reload
+sudo systemctl enable crypto-alarm # optional
+sudo systemctl start crypto-alarm
 ```
 
 ## Examples
