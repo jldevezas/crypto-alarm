@@ -5,6 +5,7 @@
 # 2021-01-07
 
 import argparse
+import logging
 import math
 import os
 import signal
@@ -15,12 +16,24 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from daemonize import Daemonize
 from playsound import playsound
 from pycoingecko import CoinGeckoAPI
+from systemd.journal import JournalHandler
 from termcolor import cprint
+
+log = logging.getLogger('crypto-alarm')
+log.addHandler(JournalHandler())
+log.setLevel(logging.INFO)
 
 PID_FILE = '/tmp/crypto-alarm.pid'
 
+
 def clog(msg, color='white'):
     cprint(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, {msg}", color=color)
+    log.info(msg)
+
+
+def csep(color='white'):
+    cprint(f"---", color=color)
+
 
 def build_track_coin(args):
     cg = CoinGeckoAPI()
@@ -32,7 +45,9 @@ def build_track_coin(args):
 
     def track_coin():
         price = cg.get_price(ids=args.coins, vs_currencies='usd')
-        for coin, step in zip(args.coins.split(','), map(int, args.steps.split(','))):
+        csep()
+
+        for coin, step in zip(args.coins.split(','), map(float, args.steps.split(','))):
             if price[coin]['usd'] >= math.ceil(last_price[coin] / step) * step:
                 clog(f"{coin} price target increased to {price[coin]['usd']} USD", color='green')
                 playsound(args.up_alert)

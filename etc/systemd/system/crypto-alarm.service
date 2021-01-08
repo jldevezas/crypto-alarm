@@ -5,7 +5,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /opt/crypto-alarm/crypto-alarm.py -c bitcoin,ethereum -s 1000,100
+ExecStart=/usr/bin/python3 /opt/crypto-alarm/crypto-alarm.py -c bitcoin,ethereum,crypto-com-chain,harvest-finance -s 1000,100,0.01,10
 TimeoutStartSec=0
 RemainAfterExit=yes
 WorkingDirectory=/opt/crypto-alarm
