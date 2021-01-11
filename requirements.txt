@@ -4,3 +4,4 @@ pycoingecko
 apscheduler
 termcolor
 daemonize
+python-binance

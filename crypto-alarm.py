@@ -10,12 +10,12 @@ import math
 import os
 import signal
 import sys
+from configparser import ConfigParser
 from datetime import datetime
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 from daemonize import Daemonize
 from playsound import playsound
-from pycoingecko import CoinGeckoAPI
 from systemd.journal import JournalHandler
 from termcolor import cprint
 
@@ -24,6 +24,11 @@ log.addHandler(JournalHandler())
 log.setLevel(logging.INFO)
 
 PID_FILE = '/tmp/crypto-alarm.pid'
+CONFIG_FILE = '~/.config/crypto-alarm.conf'
+
+
+class ConfigException(Exception):
+    pass
 
 
 def clog(msg, color='white'):
@@ -35,28 +40,78 @@ def csep(color='white'):
     cprint(f"---", color=color)
 
 
-def build_track_coin(args):
+def build_get_price(args):
+    from pycoingecko import CoinGeckoAPI
     cg = CoinGeckoAPI()
+    cg_lst = cg.get_coins_list()
+
+    def get_price_from_coingecko():
+        symbols = set(map(str.lower, args.coins.split(',')))
+
+        coin_ids = {}
+        for coin in cg_lst:
+            if coin['symbol'] in symbols:
+                coin_ids[coin['id']] = coin['symbol'].upper()
+
+        prices = cg.get_price(ids=','.join(coin_ids.keys()), vs_currencies='usd')
+        return {coin_ids[k]: v['usd'] for k, v in prices.items()}
+
+    def get_price_from_binance():
+        from binance.client import Client
+
+        config = ConfigParser()
+        config.read_file(open(args.config))
+
+        if 'binance' not in config.sections():
+            raise ConfigException("Configuration file does not contain a '[binance]' section")
+
+        if 'api_key' not in config['binance'] or config['binance']['api_key'].strip() == "":
+            raise ConfigException("Binance configuration section does not contain an 'api_key'")
+
+        if 'api_secret' not in config['binance'] or config['binance']['api_secret'].strip() == "":
+            raise ConfigException("Binance configuration section does not contain an 'api_secret'")
+
+        client = Client(config['binance']['api_key'], config['binance']['api_secret'])
+
+        coin_prices = {}
+        for coin in args.coins.split(','):
+            try:
+                coin_prices[coin] = float(client.get_symbol_ticker(symbol=f"{coin}USDT")['price'])
+            except Exception as e:
+                clog(f"ERROR: {coin} is not supported by the {args.api} API", color="red")
+                raise e
+
+        return coin_prices
+
+    if args.api == 'binance':
+        return get_price_from_binance
+    else:
+        return get_price_from_coingecko
+
+
+def build_track_coin(args):
+    get_price = build_get_price(args)
+
     last_price = {}
     for coin in args.coins.split(','):
-        price = cg.get_price(ids=args.coins, vs_currencies='usd')
-        last_price[coin] = price[coin]['usd']
+        price = get_price()
+        last_price[coin] = price[coin]
         clog(f"{coin} price @ {last_price[coin]} USD")
 
     def track_coin():
-        price = cg.get_price(ids=args.coins, vs_currencies='usd')
+        price = get_price()
         csep()
 
         for coin, step in zip(args.coins.split(','), map(float, args.steps.split(','))):
-            if price[coin]['usd'] >= math.ceil(last_price[coin] / step) * step:
-                clog(f"{coin} price target increased to {price[coin]['usd']} USD", color='green')
+            if price[coin] >= math.ceil(last_price[coin] / step) * step:
+                clog(f"{coin} price target increased to {price[coin]} USD", color='green')
                 playsound(args.up_alert)
 
-            elif price[coin]['usd'] <= math.floor(last_price[coin] / step) * step:
-                clog(f"{coin} price target decreased to {price[coin]['usd']} USD", color='red')
+            elif price[coin] <= math.floor(last_price[coin] / step) * step:
+                clog(f"{coin} price target decreased to {price[coin]} USD", color='red')
                 playsound(args.down_alert)
 
-            last_price[coin] = price[coin]['usd']
+            last_price[coin] = price[coin]
             clog(f"{coin} price @ {last_price[coin]} USD")
 
     return track_coin
@@ -65,10 +120,7 @@ def build_track_coin(args):
 def build_service(args):
     def run_service():
         scheduler = BlockingScheduler(timezone='UTC')
-        scheduler.add_job(
-            build_track_coin(args),
-            'interval',
-            seconds=args.interval)
+        scheduler.add_job(build_track_coin(args), 'interval', seconds=args.interval)
         scheduler.start()
 
     return run_service
@@ -84,10 +136,22 @@ if __name__ == '__main__':
         help="daemonize as a background service")
 
     parser.add_argument(
+        '-a', '--api',
+        choices=['coingecko', 'binance'],
+        default='coingecko',
+        help="API name (coingecko, binance)")
+
+    parser.add_argument(
+        '--config',
+        type=str,
+        default=os.path.join(os.path.expanduser("~"), ".config/crypto-alarm.conf"),
+        help="configuration file containing API keys and secrets (default: ~/.config/crypto-alarm.conf")
+
+    parser.add_argument(
         '-c', '--coins',
         type=str,
         required=False,
-        help="name of the coin in CoingGecko (e.g., bitcoin, ethereum, etc.)")
+        help="symbol of the coin to track (e.g., BTC, ETH, etc.)")
 
     parser.add_argument(
         '-s', '--steps',

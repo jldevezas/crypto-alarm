@@ -31,13 +31,13 @@ sudo systemctl start crypto-alarm
 Track price for bitcoin in the command line:
 
 ```shell
-./crypto-alarm.py -c bitcoin -s 1000
+./crypto-alarm.py -c BTC -s 1000
 ```
 
 Launch as a daemon to get audio alerts in the background:
 
 ```shell
-./crypto-alarm.py -c bitcoin,ethereum -s 1000,100 -d
+./crypto-alarm.py -c BTC,ETH -s 1000,100 -d
 ```
 
 Kill the running daemon:
